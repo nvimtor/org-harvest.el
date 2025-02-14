@@ -1,0 +1,12 @@
+* TODO org-clock CSV data to Harvest
+:LOGBOOK:
+CLOCK: [2025-02-14 Fri 16:49]--[2025-02-14 Fri 18:54] =>  2:05
+CLOCK: [2025-02-14 Fri 16:48]--[2025-02-14 Fri 16:49] =>  0:01
+CLOCK: [2025-02-14 Fri 13:57]--[2025-02-14 Fri 14:40] =>  0:10
+CLOCK: [2025-02-14 Fri 13:42]--[2025-02-14 Fri 13:57] =>  0:15
+:END:
+** DONE Make agenix-shell support Darwin
+CLOSED: [2025-02-14 Fri 13:41]
+:LOGBOOK:
+CLOCK: [2025-02-14 Fri 10:21]--[2025-02-14 Fri 13:41] =>  3:20
+:END:
