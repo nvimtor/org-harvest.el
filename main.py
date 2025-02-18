@@ -1,9 +1,13 @@
 import requests
 import os
+import argparse
 
 # timesheets = requests.get("https://api.harvestapp.com/v2/time_entries", headers = auth_headers).json()
 # print(json.dumps(timesheets['time_entries'][0], indent = 2))
 
+############
+# internal #
+############
 def get_proj_assignments(auth_headers):
   def go(next_page = None, projs = []):
     if next_page != None:
@@ -15,9 +19,30 @@ def get_proj_assignments(auth_headers):
 
   return go("https://api.harvestapp.com/v2/users/me/project_assignments")
 
-def main():
-  print("org-clock-to-harvest-start")
+############
+# commands #
+############
+def get_tasks(auth_headers):
+  proj_assignments = get_proj_assignments(auth_headers)
 
+  for proj_assign in proj_assignments:
+    client_name = proj_assign['client']['name']
+    proj = proj_assign['project']
+    tasks = [task_assign['task'] for task_assign in proj_assign['task_assignments']]
+
+    for task in tasks:
+      print(f"\"{client_name}\",\"{proj['id']}\",\"{proj['name']}\",\"{task['id']}\",\"{task['name']}\"")
+
+def push_tasks(auth_headers, path):
+  print("todo!")
+
+##############
+# entrypoint #
+##############
+def main():
+  ######################
+  # parse harvest data #
+  ######################
   harvest_pat = os.environ.get('HARVEST_PAT')
   harvest_account_id = os.environ.get('HARVEST_ACCOUNT_ID')
 
@@ -32,14 +57,24 @@ def main():
     'Harvest-Account-Id': harvest_account_id
   }
 
-  proj_assignments = get_proj_assignments(auth_headers)
+  ##################
+  # parse cmd args #
+  ##################
+  parser = argparse.ArgumentParser(description="org-harvest")
+  subparsers = parser.add_subparsers(dest="command", required=True)
 
-  for proj_assign in proj_assignments:
-    client_name = proj_assign['client']['name']
-    proj = proj_assign['project']
-    tasks = [task_assign['task'] for task_assign in proj_assign['task_assignments']]
+  parser_get = subparsers.add_parser("get_tasks", help="Retrieve tasks")
+  parser_get.set_defaults(func=lambda _: get_tasks(auth_headers))
 
-    for task in tasks:
-      print(f"\"{client_name}\",\"{proj['id']}\",\"{proj['name']}\",\"{task['id']}\",\"{task['name']}\"")
+  parser_push = subparsers.add_parser("push_tasks", help="Push tasks from a CSV file")
+  parser_push.add_argument('--from', dest='from_file', required=True,
+                           help='Path to the CSV file')
+  parser_push.set_defaults(func=lambda args: push_tasks(auth_headers, args.from_file))
+
+  args = parser.parse_args()
+  args.func(args)
+  parser = argparse.ArgumentParser()
+  parser.add_argument("command", help="get_tasks or push_tasks")
+  parser.parse_args()
 
 main()
