@@ -57,10 +57,11 @@
   :type 'list
   :group 'org-harvest)
 
-(defcustom org-harvest-state-file
-  (expand-file-name "org-harvest-state.csv" temporary-file-directory)
+(defcustom org-harvest-state-dir
+  ;; (expand-file-name "org-harvest-state.csv" temporary-file-directory)
+  temporary-file-directory
   "Path to the file where org-harvest stores temporary state data."
-  :type 'file
+  :type 'directory
   :group 'org-harvest)
 
 ;;;;;;;;;;;;;;
@@ -195,8 +196,36 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
     "hours" (format "%.2f" (+ (string-to-number total-hours)
                               (/ (string-to-number total-minutes) 60.0)))))
 
-(defun org-harvest--push ()
-  (org-harvest--run-command "push_tasks" "--from" org-harvest-state-file))
+(defvar org-harvest--prev-state-file nil)
+
+(defun org-harvest--push (state-file &optional to-delete)
+  (let* ((out (org-harvest--run-command "push_tasks" "--from" state-file)))
+    (when (not (null out))
+      (message "running!!!")
+
+      (let* ((pairs (mapcar (lambda (s) (split-string s ",")) out))
+             (ht (make-hash-table :test 'equal)))
+
+        (dolist (pair pairs)
+          (let ((unpushed-id (car pair))
+                (timesheet-id (cadr pair)))
+            (puthash unpushed-id timesheet-id ht)))
+
+        (org-ql-select org-harvest-files
+          `(or ,@(mapcar (lambda (unpushed-id)
+                           `(property "HARVEST_UNPUSHED_ID" ,unpushed-id))
+                         (hash-table-keys ht)))
+          :action (lambda ()
+                    (let* ((uid (org-entry-get nil "HARVEST_UNPUSHED_ID"))
+                           (tid (gethash uid ht)))
+                      (when tid
+                        (org-entry-delete nil "HARVEST_UNPUSHED_ID")
+                        (org-entry-put nil "HARVEST_TIMESHEET_ID" tid)))))
+        nil))))
+
+(defun org-harvest--get-deletes (prev new)
+
+  )
 ;;;;;;;;;;;;
 ;; public ;;
 ;;;;;;;;;;;;
@@ -220,15 +249,18 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
    :group 'org-harvest--tasks-group))
 
 ;;;###autoload
-(defun org-harvest-push (&optional query)
+(defun org-harvest-push ()
   "TODO docstring"
   (interactive)
-  (let ((org-clock-export-org-ql-query org-harvest--org-clock-export-query)
+  (let* ((new-state-file (expand-file-name (format "%s.csv" (org-harvest--xah/get-random-uuid)) org-harvest-state-dir))
+        (org-clock-export-org-ql-query org-harvest--org-clock-export-query)
         (org-clock-export-files org-harvest-files)
-        (org-clock-export-export-file-name org-harvest-state-file)
+        (org-clock-export-export-file-name new-state-file)
         (org-clock-export-buffer org-harvest--org-clock-export-buffer-name)
         (org-clock-export-delimiter ",")
         (org-clock-export-data-format org-harvest--org-clock-export-data-format))
-    (org-clock-export)))
+    (org-clock-export)
+    (org-harvest--push new-state-file)
+    (setq org-harvest--prev-state-file new-state-file)))
 
 ;;; org-harvest.el ends here

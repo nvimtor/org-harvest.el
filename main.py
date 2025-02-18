@@ -38,8 +38,6 @@ def get_tasks(auth_headers):
       print(f"\"{client_name}\",\"{proj['id']}\",\"{proj['name']}\",\"{task['id']}\",\"{task['name']}\"")
 
 def push_tasks(auth_headers, path):
-  pushed = {}
-
   with open(path, newline='\n') as csv_data:
     csvreader = csv.reader(csv_data, delimiter = ',')
 
@@ -47,6 +45,7 @@ def push_tasks(auth_headers, path):
 
     for row in csvreader:
       unpushed_id = row[0]
+      timesheet_id = row[1]
 
       data = {
         "project_id": row[2],
@@ -54,6 +53,13 @@ def push_tasks(auth_headers, path):
         "spent_date": row[4],
         "hours": row[5]
       }
+
+      # DELETEs in Harvest
+      # on patch error, create
+      # somehow return the new timesheet id and update that
+      # DELETEs in org
+      # -> we need to do a diff, get the current state file, do a diff, before update
+      # -> find IDs that no longer exists, python should delete these
 
       if unpushed_id != "null":
         res = requests.post("https://api.harvestapp.com/v2/time_entries",
@@ -66,11 +72,12 @@ def push_tasks(auth_headers, path):
         else:
           raise Exception(res.content)
       else:
-        print("not null")
+        res = requests.patch(f"https://api.harvestapp.com/v2/time_entries/{timesheet_id}",
+                             headers = auth_headers,
+                             json = data)
 
-      # print(f"\"{unpushed_id}\",\"{harvest_id}\"")
-
-  return pushed
+        if (res.status_code != 200):
+          raise Exception(res.content)
 
 ##############
 # entrypoint #
