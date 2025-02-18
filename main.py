@@ -1,13 +1,17 @@
 import requests
 import os
 import argparse
-
-# timesheets = requests.get("https://api.harvestapp.com/v2/time_entries", headers = auth_headers).json()
-# print(json.dumps(timesheets['time_entries'][0], indent = 2))
+import csv
 
 ############
 # internal #
 ############
+def path_exists(string):
+  if os.path.exists(string):
+    return string
+  else:
+    raise NotADirectoryError(string)
+
 def get_proj_assignments(auth_headers):
   def go(next_page = None, projs = []):
     if next_page != None:
@@ -34,7 +38,39 @@ def get_tasks(auth_headers):
       print(f"\"{client_name}\",\"{proj['id']}\",\"{proj['name']}\",\"{task['id']}\",\"{task['name']}\"")
 
 def push_tasks(auth_headers, path):
-  print("todo!")
+  pushed = {}
+
+  with open(path, newline='\n') as csv_data:
+    csvreader = csv.reader(csv_data, delimiter = ',')
+
+    next(csvreader, None)
+
+    for row in csvreader:
+      unpushed_id = row[0]
+
+      data = {
+        "project_id": row[2],
+        "task_id": row[3],
+        "spent_date": row[4],
+        "hours": row[5]
+      }
+
+      if unpushed_id != "null":
+        res = requests.post("https://api.harvestapp.com/v2/time_entries",
+                            headers = auth_headers,
+                            json = data)
+
+        if (res.status_code == 201):
+          json = res.json()
+          print(f"{unpushed_id},{json['id']}")
+        else:
+          raise Exception(res.content)
+      else:
+        print("not null")
+
+      # print(f"\"{unpushed_id}\",\"{harvest_id}\"")
+
+  return pushed
 
 ##############
 # entrypoint #
@@ -67,14 +103,11 @@ def main():
   parser_get.set_defaults(func=lambda _: get_tasks(auth_headers))
 
   parser_push = subparsers.add_parser("push_tasks", help="Push tasks from a CSV file")
-  parser_push.add_argument('--from', dest='from_file', required=True,
+  parser_push.add_argument('--from', type=path_exists, dest='from_file', required=True,
                            help='Path to the CSV file')
   parser_push.set_defaults(func=lambda args: push_tasks(auth_headers, args.from_file))
 
   args = parser.parse_args()
   args.func(args)
-  parser = argparse.ArgumentParser()
-  parser.add_argument("command", help="get_tasks or push_tasks")
-  parser.parse_args()
 
 main()
