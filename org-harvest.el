@@ -46,8 +46,9 @@
   :group 'tools
   :prefix "org-harvest-")
 
-(defcustom org-harvest-cmd
-  (list shell-file-name shell-command-switch "./result/bin/org-harvest")
+(defcustom org-harvest-cmd "./result/bin/org-harvest"
+  "Path to the org-harvest executable."
+  :type 'string
   :group 'org-harvest)
 
 ;;;;;;;;;;;;;;
@@ -88,58 +89,20 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
      line)
     line))
 
-(defun org-harvest--get-output-buffer ()
-  (cl-letf*
-      (((default-value 'process-environment) process-environment)
-       ((default-value 'exec-path) exec-path))
-    (let ((buf (generate-new-buffer org-harvest--output-buffer-name)))
-      (with-current-buffer buf
-        (setq-local process-environment (default-value 'process-environment))
-        (setq-local exec-path (default-value 'exec-path)))
-      buf)))
+(defun org-harvest--build-command (subcommand)
+  "Build the full command string by appending SUBCOMMAND to `org-harvest-cmd`."
+  (format "%s %s" org-harvest-cmd subcommand))
 
-(defun org-harvest--get-tasks-async-sentinel (proc event cb)
-  (ignore event)
-  (when (eq 0 (process-exit-status proc))
-    (with-current-buffer (process-buffer proc)
-      (goto-char (point-min))
-      (let ((tasks (split-string (buffer-string) "\n" t)))
-        (when (and cb (functionp cb))
-          (funcall cb tasks)))
-      (kill-buffer (process-buffer proc)))))
-
-(defun org-harvest--get-tasks-async (cb)
-  "Returns all projects from Harvest. Format returned:
-clientid,projectid,taskid"
-  (let ((cmd (or org-harvest-cmd "python3 main.py"))
-         (process-name org-harvest--process-name)
-         (process-buffer (org-harvest--get-output-buffer)))
-    (when (get-process process-name)
-      (kill-process process-name))
-    (make-process
-     :name process-name
-     :buffer process-buffer
-     :command cmd
-     :noquery t
-     :sentinel (lambda (proc event) (org-harvest--get-tasks-async-sentinel proc event cb)))))
+(defun org-harvest--run-command (command)
+  "Execute the shell COMMAND synchronously.
+Return its output as a list of non-empty lines. Signal an error if the command fails."
+  (message "Executing command: %s" command)
+  ;; `process-lines` calls the shell and returns a list of lines.
+  (process-lines shell-file-name shell-command-switch command))
 
 (defun org-harvest--get-tasks-sync ()
   "Return tasks from Harvest as a list of strings, synchronously."
-  (let ((buf (org-harvest--get-output-buffer)))
-    (unwind-protect
-        (let ((exit-code
-               (apply #'call-process
-                      (car org-harvest-cmd)  ; e.g. /bin/sh
-                      nil                    ; no input file
-                      buf                    ; capture output in buf
-                      nil                    ; don't redisplay
-                      (cdr org-harvest-cmd) ; the rest: (-c ./result/bin/org-harvest)
-                      )))
-          (unless (eq exit-code 0)
-            (error "org-harvest-cmd failed with exit code %s" exit-code))
-          (with-current-buffer buf
-            (split-string (buffer-string) "\n" t)))
-      (kill-buffer buf))))
+  (org-harvest--run-command (org-harvest--build-command "get_tasks")))
 
 (defun org-harvest--tasks-group (cand transform)
   "Function for Consult to group or transform a candidate string with text properties."
@@ -212,10 +175,5 @@ clientid,projectid,taskid"
         (org-clock-export-delimiter ",")
         (org-clock-export-data-format org-harvest--org-clock-export-data-format))
     (org-clock-export)))
-
-(org-ql-query
-  :select #'org-get-property-block
-  :from "~/org/zenobe/dailies.org"
-  :where '(property "HARVEST_PROJECT_ID"))
 
 ;;; org-harvest.el ends here
