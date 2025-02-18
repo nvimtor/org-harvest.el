@@ -162,6 +162,23 @@ clientid,projectid,taskid"
 (defun org-harvest--tasks-lookup (selected cands &rest _)
   (car (member selected cands)))
 
+(defvar org-harvest--org-clock-export-buffer-name
+  "*ORG-HARVEST-ORG-CLOCK-EXPORT CSV*")
+
+(defvar org-harvest--org-clock-export-query
+  '(and (property "HARVEST_PROJECT_ID")
+        (property "HARVEST_TASK_ID")))
+
+(defvar org-harvest--org-clock-export-data-format
+  '("projid" (org-entry-get (point) "HARVEST_PROJECT_ID")
+    "taskid" (org-entry-get (point) "HARVEST_TASK_ID")
+    "spent_date" (format "%04d-%02d-%02d"
+                         (string-to-number start-year)
+                         (string-to-number start-month)
+                         (string-to-number start-day))
+    "hours" (format "%.2f" (+ (string-to-number total-hours)
+                              (/ (string-to-number total-minutes) 60.0)))))
+
 ;;;;;;;;;;;;
 ;; public ;;
 ;;;;;;;;;;;;
@@ -183,5 +200,22 @@ clientid,projectid,taskid"
    :state 'org-harvest--tasks-state
    :lookup 'org-harvest--tasks-lookup
    :group 'org-harvest--tasks-group))
+
+;;;###autoload
+(defun org-harvest-push (&optional query)
+  "TODO docstring"
+  (interactive)
+  (let ((org-clock-export-org-ql-query org-harvest--org-clock-export-query)
+        (org-clock-export-files "~/org/zenobe/dailies.org")
+        (org-clock-export-export-file-name "~/org/zenobe/export.csv")
+        (org-clock-export-buffer org-harvest--org-clock-export-buffer-name)
+        (org-clock-export-delimiter ",")
+        (org-clock-export-data-format org-harvest--org-clock-export-data-format))
+    (org-clock-export)))
+
+(org-ql-query
+  :select #'org-get-property-block
+  :from "~/org/zenobe/dailies.org"
+  :where '(property "HARVEST_PROJECT_ID"))
 
 ;;; org-harvest.el ends here
