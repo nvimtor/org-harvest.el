@@ -178,14 +178,10 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
 
 (defvar org-harvest--org-clock-export-query
   '(and (property "HARVEST_PROJECT_ID")
-        (property "HARVEST_TASK_ID")))
-
-;; (defvar org-harvest--org-clock-export-query
-;;   '(and (property "HARVEST_PROJECT_ID")
-;;         (property "HARVEST_TASK_ID")
-;;         (or
-;;          (property "HARVEST_UNPUSHED_ID")
-;;          (property "HARVEST_TIMESHEET_ID"))))
+        (property "HARVEST_TASK_ID")
+        (or
+         (property "HARVEST_UNPUSHED_ID")
+         (property "HARVEST_TIMESHEET_ID"))))
 
 (defvar org-harvest--org-clock-export-data-format
   '("unpushedid" (or (org-entry-get (point) "HARVEST_UNPUSHED_ID") "null")
