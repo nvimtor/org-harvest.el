@@ -293,10 +293,6 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
                   old-ids
                   new-ids
                   :test 'equal)))
-      (message "diff: %s" diff)
-      (message "old ids: %s" old-ids)
-      (message "new ids: %s" new-ids)
-
       diff)))
 
 (defun org-harvest--clean-deletes (deletes)
@@ -318,9 +314,7 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
    (consult--dynamic-collection
        (lambda (input cb)
          (ignore input)
-
          (funcall cb org-harvest--projects-cache)
-
          (let* ((tasks (org-harvest--get-tasks-sync))
                 (propertized (mapcar #'org-harvest--propertize-line tasks)))
            (setq org-harvest--projects-cache propertized)
@@ -342,20 +336,13 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
          (org-clock-export-buffer org-harvest--org-clock-export-buffer-name)
          (org-clock-export-delimiter ",")
          (org-clock-export-data-format org-harvest--org-clock-export-data-format))
-
     (org-clock-export)
     (org-harvest--push new-state-file)
     (org-clock-export)
-
     (let ((deletes (org-harvest--get-deletes
                     org-harvest--prev-state-file
                     new-state-file)))
-
-      (message "deletes: %s" deletes)
       (org-harvest--clean-deletes deletes)
-
-      (message "passed!")
-      (setq org-harvest--prev-state-file new-state-file)
-      )))
+      (setq org-harvest--prev-state-file new-state-file))))
 
 ;;; org-harvest.el ends here
