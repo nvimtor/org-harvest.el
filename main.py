@@ -37,6 +37,17 @@ def get_tasks(auth_headers):
     for task in tasks:
       print(f"\"{client_name}\",\"{proj['id']}\",\"{proj['name']}\",\"{task['id']}\",\"{task['name']}\"")
 
+def delete_timesheets(auth_headers, ids = []):
+  for _id in ids:
+    res = requests.delete(
+      f"https://api.harvestapp.com/v2/time_entries/{_id}",
+      headers = auth_headers
+    )
+
+    if res.status_code != 200:
+      raise Exception(f"Failed to delete timesheet {_id}\n{res.content}")
+
+
 def push_tasks(auth_headers, path):
   with open(path, newline='\n') as csv_data:
     csvreader = csv.reader(csv_data, delimiter = ',')
@@ -66,6 +77,7 @@ def push_tasks(auth_headers, path):
                             headers = auth_headers,
                             json = data)
 
+        # if (res.status_code == 201):
         if (res.status_code == 201):
           json = res.json()
           print(f"{unpushed_id},{json['id']}")
@@ -109,9 +121,23 @@ def main():
   parser_get = subparsers.add_parser("get_tasks", help="Retrieve tasks")
   parser_get.set_defaults(func=lambda _: get_tasks(auth_headers))
 
+  parser_deletes = subparsers.add_parser("delete_timesheets",
+                                         help="Delete timesheets from Harvest.")
+  parser_deletes.add_argument("--ids",
+                              dest="delete_ids",
+                              required=True,
+                              default=[],
+                              type=lambda t: [s.strip() for s in t.split(',')])
+
+  parser_deletes.set_defaults(func=lambda args: delete_timesheets(auth_headers, args.delete_ids))
+
   parser_push = subparsers.add_parser("push_tasks", help="Push tasks from a CSV file")
-  parser_push.add_argument('--from', type=path_exists, dest='from_file', required=True,
+  parser_push.add_argument('--from',
+                           type=path_exists,
+                           dest='from_file',
+                           required=True,
                            help='Path to the CSV file')
+
   parser_push.set_defaults(func=lambda args: push_tasks(auth_headers, args.from_file))
 
   args = parser.parse_args()

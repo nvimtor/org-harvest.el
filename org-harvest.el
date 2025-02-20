@@ -30,7 +30,13 @@
 
 ;;; Code:
 
+;;;;;;;;;;;;;;
+;; requires ;;
+;;;;;;;;;;;;;;
 (require 'cl-lib)
+(require 'org-ql)
+(require 'rx)
+
 
 ;; NOTE this is required, see https://github.com/minad/consult/issues/1149
 ;; (setq consult-async-min-input 0)
@@ -63,6 +69,49 @@
   "Path to the file where org-harvest stores temporary state data."
   :type 'directory
   :group 'org-harvest)
+
+;;;;;;;;;;;;
+;; consts ;;
+;;;;;;;;;;;;
+(defconst org-harvest--org-clock-export/clock-re
+  (rx (seq bol
+     (zero-or-more (any "	 "))
+     "CLOCK: ")
+      (seq "["
+     (group-n 1 (= 4 digit)) ;; start year
+     "-"
+     (group-n 2 (= 2 digit)) ;; start month
+     "-"
+     (group-n 3 (= 2 digit)) ;; start day
+     (one-or-more space)
+     (group-n 4 (= 3 alpha)) ;; start DOW
+     (one-or-more space)
+     (group-n 5 (= 2 digit)) ;; start hour
+     ":"
+     (group-n 6 (= 2 digit)) ;; start minute
+     "]")
+      "--"
+      (seq "["
+     (group-n 7 (= 4 digit)) ;; end year
+     "-"
+     (group-n 8 (= 2 digit)) ;; end month
+     "-"
+     (group-n 9 (= 2 digit)) ;; end day
+     (one-or-more space)
+     (group-n 10 (= 3 alpha)) ;; end DOW
+     (one-or-more space)
+     (group-n 11 (= 2 digit)) ;; end hour
+     ":"
+     (group-n 12 (= 2 digit)) ;; end minute
+     "]")
+      (seq (one-or-more space)
+     "=>"
+     (one-or-more space))
+      (seq (group-n 15 ;; total time (hh:mm format)
+        (group-n 13 (one-or-more digit)) ;; total hours
+        ":"
+        (group-n 14 (one-or-more digit))))) ;; total minutes
+  "Clock line RE.  The groups are explained in the comments.")
 
 ;;;;;;;;;;;;;;
 ;; internal ;;
@@ -198,19 +247,18 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
 
 (defvar org-harvest--prev-state-file nil)
 
-(defun org-harvest--push (state-file &optional to-delete)
-  (let* ((out (org-harvest--run-command "push_tasks" "--from" state-file)))
-    (when (not (null out))
-      (message "running!!!")
-
+(defun org-harvest--push (state-file)
+  (let* ((out (org-harvest--run-command
+               "push_tasks"
+               "--from"
+               state-file)))
+    (when out
       (let* ((pairs (mapcar (lambda (s) (split-string s ",")) out))
              (ht (make-hash-table :test 'equal)))
-
         (dolist (pair pairs)
           (let ((unpushed-id (car pair))
                 (timesheet-id (cadr pair)))
             (puthash unpushed-id timesheet-id ht)))
-
         (org-ql-select org-harvest-files
           `(or ,@(mapcar (lambda (unpushed-id)
                            `(property "HARVEST_UNPUSHED_ID" ,unpushed-id))
@@ -223,9 +271,42 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
                         (org-entry-put nil "HARVEST_TIMESHEET_ID" tid)))))
         nil))))
 
-(defun org-harvest--get-deletes (prev new)
+(defun org-harvest--get-pushed-ids-from-export-file (path)
+  (let ((out '())
+        (content (with-temp-buffer
+                   (insert-file-contents path)
+                   (buffer-string))))
+    (dolist (line (cdr (split-string content "\n")))
+      (let* ((fields (split-string line ","))
+             (timesheetid (nth 1 fields)))
+        (when (and timesheetid (not (string= timesheetid "null")))
+          (push timesheetid out))))
+    out))
 
-  )
+(defun org-harvest--get-deletes (prev-path new-path)
+  (when (and
+         (file-exists-p prev-path)
+         (file-exists-p new-path))
+    (let* ((old-ids (org-harvest--get-pushed-ids-from-export-file prev-path))
+           (new-ids (org-harvest--get-pushed-ids-from-export-file new-path))
+           (diff (cl-set-difference
+                  old-ids
+                  new-ids
+                  :test 'equal)))
+      (message "diff: %s" diff)
+      (message "old ids: %s" old-ids)
+      (message "new ids: %s" new-ids)
+
+      diff)))
+
+(defun org-harvest--clean-deletes (deletes)
+  (when deletes
+    (org-harvest--run-command
+     "delete_timesheets"
+     "--ids"
+     (string-join deletes ",")
+     )))
+
 ;;;;;;;;;;;;
 ;; public ;;
 ;;;;;;;;;;;;
@@ -252,15 +333,29 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
 (defun org-harvest-push ()
   "TODO docstring"
   (interactive)
-  (let* ((new-state-file (expand-file-name (format "%s.csv" (org-harvest--xah/get-random-uuid)) org-harvest-state-dir))
-        (org-clock-export-org-ql-query org-harvest--org-clock-export-query)
-        (org-clock-export-files org-harvest-files)
-        (org-clock-export-export-file-name new-state-file)
-        (org-clock-export-buffer org-harvest--org-clock-export-buffer-name)
-        (org-clock-export-delimiter ",")
-        (org-clock-export-data-format org-harvest--org-clock-export-data-format))
+  (let* ((new-state-file (expand-file-name
+                          (format "%s.csv" (org-harvest--xah/get-random-uuid))
+                          org-harvest-state-dir))
+         (org-clock-export-org-ql-query org-harvest--org-clock-export-query)
+         (org-clock-export-files org-harvest-files)
+         (org-clock-export-export-file-name new-state-file)
+         (org-clock-export-buffer org-harvest--org-clock-export-buffer-name)
+         (org-clock-export-delimiter ",")
+         (org-clock-export-data-format org-harvest--org-clock-export-data-format))
+
     (org-clock-export)
     (org-harvest--push new-state-file)
-    (setq org-harvest--prev-state-file new-state-file)))
+    (org-clock-export)
+
+    (let ((deletes (org-harvest--get-deletes
+                    org-harvest--prev-state-file
+                    new-state-file)))
+
+      (message "deletes: %s" deletes)
+      (org-harvest--clean-deletes deletes)
+
+      (message "passed!")
+      (setq org-harvest--prev-state-file new-state-file)
+      )))
 
 ;;; org-harvest.el ends here
