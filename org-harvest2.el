@@ -135,9 +135,12 @@ Version: 2020-06-04 2023-05-13"
   "https://api.harvestapp.com/v2/users/me/project_assignments"
   "Harvest API URL for user project assignments.")
 
+(defconst org--harvest-time-entries-api-url
+  "https://api.harvestapp.com/v2/time_entries"
+  "Harvest API URL for time entries.")
+
 (defvar org-harvest--projects-cache '()
   "Recently fetched projects from Harvest.")
-
 
 (defun org-harvest--get-authinfo ()
   "Retrieve Harvest authentication info from .authinfo.
@@ -182,6 +185,76 @@ Returns a complete list of assignments."
                       (go next-page all-assignments))
                   assignments)))
     (go org--harvest-project-assignments-api-url nil)))
+
+;; first comes the DELETEs
+
+;; unpushed id (internal)
+;; create (already exists)
+;; patch it
+;; add id to state
+
+;; timesheet id (from harvest)
+;; patch (not created)
+;; create
+;; add id to state
+
+;; filesystem state (txt file)
+;; will hold pushed IDs
+
+(defun org-harvest--delete-time-entry (id
+                                     projid
+                                     taskid
+                                     spentdate
+                                     hours
+                                     headers
+                                     cb)
+  ())
+
+
+(defun org-harvest--patch-time-entry (id
+                                      content
+                                      headers
+                                      cb)
+  ())
+
+(defun org-harvest--post-time-entry (id
+                                     content
+                                     headers
+                                     cb)
+  (request org--harvest-time-entries-api-url
+    :type "POST"
+    :parser 'json-read
+    :headers headers
+    :data content
+    :success (cl-function
+              (lambda (&key data &allow-other-keys)
+                (alist-get 'id data)))))
+
+
+(defun org-harvest--sync-action (unpushedid
+                                 timesheetid
+                                 projid
+                                 taskid
+                                 spentdate
+                                 hours
+                                 headers
+                                 cb)
+
+  (let* ((content `(("project_id" . ,projid)
+                    ("task_id"        . ,taskid)
+                    ("spent_date"     . ,spentdate)
+                    ("hours"          . ,hours))))
+    (when unpushedid
+      (org-harvest--post-time-entry
+       unpushedid
+       content
+       headers
+       '(lambda (newid) (message "new id received: %s" newid)))
+      (message "unpushed!"))
+
+    (when timesheetid
+      (message "hello there!"))
+    ))
 
 (defun org-harvest--tasks-get-cands (project-assignments)
   "Convert PROJECT-ASSIGNMENTS into a list of JSON-encoded strings.
@@ -258,6 +331,65 @@ Example of one returned JSON candidate:
           (taskid (alist-get 'taskId alist)))
      (org-harvest--assign-task (format "%s" projid) (format "%s" taskid))))))
 
+;; NOTE sync portion
+(defvar org-harvest--export-data-format
+  '("unpushedid" (org-entry-get (point) "HARVEST_UNPUSHED_ID")
+    "timesheetid" (org-entry-get (point) "HARVEST_TIMESHEET_ID")
+    "projid" (org-entry-get (point) "HARVEST_PROJECT_ID")
+    "taskid" (org-entry-get (point) "HARVEST_TASK_ID")
+    "spent_date" (format "%04d-%02d-%02d"
+                         (string-to-number start-year)
+                         (string-to-number start-month)
+                         (string-to-number start-day))
+    "hours" (format "%.2f" (+ (string-to-number total-hours)
+                              (/ (string-to-number total-minutes) 60.0)))))
+
+(defmacro org-harvest--parse-clock-lines-in-heading (arg)
+  `(save-excursion
+     (cl-flet ((get-limit () (or (save-excursion
+                                   (end-of-line)
+                                   (re-search-forward org-heading-regexp nil t))
+                                 (point-max))))
+       (cl-loop while
+                (re-search-forward org-harvest--org-clock-export/clock-re (get-limit) 'no-error)
+                collect
+                (cl-flet ((get-match (num) (org-no-properties (match-string num))))
+                  (let ((start-year (get-match 1))
+                        (start-month (get-match 2))
+                        (start-day (get-match 3))
+                        (total-hours (get-match 13))
+                        (total-minutes (get-match 14)))
+                    (list
+                     ,@(cl-loop
+                        for i from 0 below (length arg) by 2
+                        collect `(cons ,(nth i arg)
+                                       ,(nth (1+ i) arg))))))))))
+
+
+(defvar org-harvest--sync-query
+  '(and (clocked)
+        (property "HARVEST_PROJECT_ID")
+        (property "HARVEST_TASK_ID")
+        (or
+         (property "HARVEST_UNPUSHED_ID")
+         (property "HARVEST_TIMESHEET_ID"))))
+
+;; FIXME shouldn't flatten the results; we need to get the total
+(defun org-harvest--sync ()
+  "Run org-ql to process all headings in `org-clock-export-files' and
+return a list with an element for each clock line."
+  (cl-loop for each in
+           (org-ql-select (or org-harvest-files
+                              (org-agenda-files))
+             org-harvest--sync-query
+             :action `(lambda ()
+                       (let* ((data (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
+                         ;; (org-harvest--sync-action)
+                         (message "rsasassulataaaaa:a %S" data)
+                         (message "aareasasultaaa aaais..: %S" data)
+                         data)))
+     append each))
+
 ;;;###autoload
 (defun org-harvest-tasks ()
   (interactive)
@@ -274,5 +406,10 @@ Example of one returned JSON candidate:
              (funcall cb cands))))
      :state 'org-harvest--tasks-state
      :group 'org-harvest--tasks-group)))
+
+;;;###autoload
+(defun org-harvest-sync ()
+  (interactive)
+  (message "todo!"))
 
 ;;; org-harvest2.el ends here
