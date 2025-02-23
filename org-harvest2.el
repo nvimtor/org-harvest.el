@@ -297,10 +297,10 @@ Example of one returned JSON candidate:
 (defun org-harvest--tasks-state (action cand)
   (pcase action
   ('return
-   (let* ((alist (org-harvest--parse-json-cand cand))
-          (projid (alist-get 'projectId alist))
-          (taskid (alist-get 'taskId alist)))
-     (org-harvest--assign-task (format "%s" projid) (format "%s" taskid))))))
+   (let-alist (org-harvest--parse-json-cand cand)
+     (org-harvest--assign-task
+      (number-to-string .projectId)
+      (number-to-string .taskId))))))
 
 ;; NOTE sync portion
 (defvar org-harvest--export-data-format
