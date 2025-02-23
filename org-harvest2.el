@@ -230,32 +230,6 @@ Returns a complete list of assignments."
               (lambda (&key data &allow-other-keys)
                 (alist-get 'id data)))))
 
-
-(defun org-harvest--sync-action (unpushedid
-                                 timesheetid
-                                 projid
-                                 taskid
-                                 spentdate
-                                 hours
-                                 headers
-                                 cb)
-
-  (let* ((content `(("project_id" . ,projid)
-                    ("task_id"        . ,taskid)
-                    ("spent_date"     . ,spentdate)
-                    ("hours"          . ,hours))))
-    (when unpushedid
-      (org-harvest--post-time-entry
-       unpushedid
-       content
-       headers
-       '(lambda (newid) (message "new id received: %s" newid)))
-      (message "unpushed!"))
-
-    (when timesheetid
-      (message "hello there!"))
-    ))
-
 (defun org-harvest--tasks-get-cands (project-assignments)
   "Convert PROJECT-ASSIGNMENTS into a list of JSON-encoded strings.
 Each string corresponds to a single task in a given project. The
@@ -333,15 +307,15 @@ Example of one returned JSON candidate:
 
 ;; NOTE sync portion
 (defvar org-harvest--export-data-format
-  '("unpushedid" (org-entry-get (point) "HARVEST_UNPUSHED_ID")
-    "timesheetid" (org-entry-get (point) "HARVEST_TIMESHEET_ID")
-    "projid" (org-entry-get (point) "HARVEST_PROJECT_ID")
-    "taskid" (org-entry-get (point) "HARVEST_TASK_ID")
-    "spent_date" (format "%04d-%02d-%02d"
+  '('unpushedid (org-entry-get (point) "HARVEST_UNPUSHED_ID")
+    'timesheetid (org-entry-get (point) "HARVEST_TIMESHEET_ID")
+    'projid (org-entry-get (point) "HARVEST_PROJECT_ID")
+    'taskid (org-entry-get (point) "HARVEST_TASK_ID")
+    'spent_date (format "%04d-%02d-%02d"
                          (string-to-number start-year)
                          (string-to-number start-month)
                          (string-to-number start-day))
-    "hours" (format "%.2f" (+ (string-to-number total-hours)
+    'hours (format "%.2f" (+ (string-to-number total-hours)
                               (/ (string-to-number total-minutes) 60.0)))))
 
 (defmacro org-harvest--parse-clock-lines-in-heading (arg)
@@ -365,7 +339,6 @@ Example of one returned JSON candidate:
                         collect `(cons ,(nth i arg)
                                        ,(nth (1+ i) arg))))))))))
 
-
 (defvar org-harvest--sync-query
   '(and (clocked)
         (property "HARVEST_PROJECT_ID")
@@ -374,21 +347,82 @@ Example of one returned JSON candidate:
          (property "HARVEST_UNPUSHED_ID")
          (property "HARVEST_TIMESHEET_ID"))))
 
+(defun my/testing ()
+  (interactive)
+  (let ((myalist '((abc . 2))))
+    (message "%S" myalist)
+    (message "%s" (alist-get 'abc myalist))
+    (message "%s" (type-of (alist-get 'abc myalist)))
+    ))
+
+(defun org-harvest--sync-get-total-hours (logbooks)
+  "Sums up the hours for each logbook in LOGBOOKS."
+  (message "called with: %S" logbooks)
+  (seq-reduce #'+
+              (mapcar (lambda (logb)
+                        (string-to-number (alist-get 'hours logb)))
+                      logbooks)
+              0))
+
+(defun org-harvest--sync-action (logbooks headers cb)
+  "TODO docstring."
+  (let ((hours       (org-harvest--sync-get-total-hours logbooks)))
+         ;; (content `(("project_id" . ,projid)
+         ;;            ("task_id"    . ,taskid)
+         ;;            ("spent_date" . ,spentdate)
+         ;;            ("hours"      . ,hours))))
+    (message "data is: %s" logbooks)
+    (message "hours is: %s" hours)
+
+    (message "length: %s" (length logbooks))
+    ;; (message "unpushed id: %s" unpushedid)
+
+    ;; (when unpushedid
+    ;;   (org-harvest--post-time-entry
+    ;;    unpushedid
+    ;;    content
+    ;;    headers
+    ;;    cb)
+    ;;   (message "unpushed!"))
+
+    (when timesheetid
+      (message "hello there!"))))
+
+(defun my/another-test ()
+  (interactive)
+  (let ((res `(org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
+    (message "content: %S" res)
+    (message "type here: %S" (type-of (alist-get 'hours res)))))
+
 ;; FIXME shouldn't flatten the results; we need to get the total
 (defun org-harvest--sync ()
   "Run org-ql to process all headings in `org-clock-export-files' and
 return a list with an element for each clock line."
-  (cl-loop for each in
-           (org-ql-select (or org-harvest-files
-                              (org-agenda-files))
-             org-harvest--sync-query
-             :action `(lambda ()
-                       (let* ((data (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
-                         ;; (org-harvest--sync-action)
-                         (message "rsasassulataaaaa:a %S" data)
-                         (message "aareasasultaaa aaais..: %S" data)
-                         data)))
-     append each))
+  (let* ((authinfo (org-harvest--get-authinfo))
+         (headers (org-harvest--make-request-headers authinfo)))
+    (cl-loop for logbooks in
+             (org-ql-select (or org-harvest-files
+                                org-agenda-files)
+               org-harvest--sync-query
+               :action `(org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format))
+               ;; :action `(lambda ()
+               ;;            (let* ((data (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
+               ;;              (message "type here: %S" (type-of (alist-get 'hours data)))
+               ;;              (org-harvest--sync-action
+               ;;               data
+               ;;               ',headers
+               ;;               '(lambda (newid)
+               ;;                  (message "new id?a!: %s" newid)))
+               ;;              data)))
+             ;; do (message "test: %s" (alist-get 'projid each)))
+             ;; do (message "test: %s" (consp (car (car each)))))
+             ;; do (message "test: %s" (alist-get "unpushedid" (car each) nil nil #'equal)))
+             do (org-harvest--sync-action
+                 logbooks
+                 headers
+                 (lambda (newid) (message "newid: %s" newid))))
+    (setq org-ql-cache (make-hash-table :test 'equal))
+    ))
 
 ;;;###autoload
 (defun org-harvest-tasks ()
@@ -410,6 +444,7 @@ return a list with an element for each clock line."
 ;;;###autoload
 (defun org-harvest-sync ()
   (interactive)
-  (message "todo!"))
+  (org-harvest--sync)
+  (message "done!"))
 
 ;;; org-harvest2.el ends here
