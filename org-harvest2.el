@@ -347,14 +347,6 @@ Example of one returned JSON candidate:
          (property "HARVEST_UNPUSHED_ID")
          (property "HARVEST_TIMESHEET_ID"))))
 
-(defun my/testing ()
-  (interactive)
-  (let ((myalist '((abc . 2))))
-    (message "%S" myalist)
-    (message "%s" (alist-get 'abc myalist))
-    (message "%s" (type-of (alist-get 'abc myalist)))
-    ))
-
 (defun org-harvest--sync-get-total-hours (logbooks)
   "Sums up the hours for each logbook in LOGBOOKS."
   (message "called with: %S" logbooks)
@@ -388,13 +380,6 @@ Example of one returned JSON candidate:
     (when timesheetid
       (message "hello there!"))))
 
-(defun my/another-test ()
-  (interactive)
-  (let ((res `(org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
-    (message "content: %S" res)
-    (message "type here: %S" (type-of (alist-get 'hours res)))))
-
-;; FIXME shouldn't flatten the results; we need to get the total
 (defun org-harvest--sync ()
   "Run org-ql to process all headings in `org-clock-export-files' and
 return a list with an element for each clock line."
