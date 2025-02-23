@@ -278,13 +278,10 @@ Example of one returned JSON candidate:
 
 (defun org-harvest--tasks-group (cand transform)
   "Function for Consult to group or transform a candidate string with text properties."
-  (let* ((alist (org-harvest--parse-json-cand cand))
-         (clientname (alist-get 'clientName alist))
-         (projname   (alist-get 'projectName alist))
-         (taskname   (alist-get 'taskName alist)))
+  (let-alist (org-harvest--parse-json-cand cand)
     (if (not transform)
-        (format "%s (%s)" clientname projname)
-      taskname)))
+        (format "%s (%s)" .clientName .projectName)
+      .taskName)))
 
 (defun org-harvest--assign-task (projid taskid)
   (when (not (or
