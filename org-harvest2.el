@@ -352,8 +352,8 @@ Example of one returned JSON candidate:
                       logbooks)
               0))
 
-(defun org-harvest--sync-action (logbooks headers)
-  "TODO docstring."
+(defun org-harvest--sync-action (logbooks headers marker)
+  "TODO docstring. MARKER is where the heading is located."
   (let-alist (car logbooks)
     (let* ((hours (org-harvest--sync-get-total-hours logbooks))
           (content `(("project_id" . ,.projid)
@@ -368,8 +368,10 @@ Example of one returned JSON candidate:
          headers
          (lambda
            (newid)
-           (org-entry-delete nil "HARVEST_UNPUSHED_ID")
-           (org-entry-put nil "HARVEST_TIMESHEET_ID" newid))))
+           (with-current-buffer (marker-buffer marker)
+             (goto-char marker)
+             (org-entry-delete nil "HARVEST_UNPUSHED_ID")
+             (org-entry-put nil "HARVEST_TIMESHEET_ID" (number-to-string newid))))))
 
       (message "total hours: %s" hours)
       (message "data: %s" content))))
@@ -386,8 +388,15 @@ return a list with an element for each clock line."
              (org-ql-select (or org-harvest-files
                                 org-agenda-files)
                org-harvest--sync-query
-               :action `(org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format))
-             do (org-harvest--sync-action logbooks headers))
+               :action
+               `(lambda
+                  ()
+                  (let ((marker (point-marker))
+                        (out (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
+                    (message "marker: %S" marker)
+                    (org-harvest--sync-action out ',headers marker)
+                    (message "out: %s" out))))
+             do (message "done!"))
     (setq org-ql-cache (make-hash-table :test 'equal))
     ))
 
