@@ -352,7 +352,7 @@ Example of one returned JSON candidate:
                       logbooks)
               0))
 
-(defun org-harvest--sync-action (logbooks headers marker)
+(defun org-harvest--sync-logbooks (logbooks headers marker)
   "TODO docstring. MARKER is where the heading is located."
   (let-alist (car logbooks)
     (let* ((hours (org-harvest--sync-get-total-hours logbooks))
@@ -361,7 +361,6 @@ Example of one returned JSON candidate:
                      ("spent_date" . ,.spent_date)
                      ("hours"      . ,hours))))
       (when .unpushedid
-        (message "unpushed, starting...")
         (org-harvest--post-time-entry
          .unpushedid
          content
@@ -372,33 +371,17 @@ Example of one returned JSON candidate:
              (goto-char marker)
              (org-entry-delete nil "HARVEST_UNPUSHED_ID")
              (org-entry-put nil "HARVEST_TIMESHEET_ID" (number-to-string newid))))))
-
       (message "total hours: %s" hours)
       (message "data: %s" content))))
 
-;; (defun org-harvest--unpushed-to-pushed-header (unpushedid timesheetid)
-;;   (org-entry))
+(defun org-harvest--sync-action (headers)
+  `(let ((marker (point-marker))
+        (logbooks (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
+    (org-harvest--sync-logbooks logbooks ',headers marker)))
 
-(defun org-harvest--sync ()
-  "Run org-ql to process all headings in `org-clock-export-files' and
-return a list with an element for each clock line."
-  (let* ((authinfo (org-harvest--get-authinfo))
-         (headers (org-harvest--make-request-headers authinfo)))
-    (cl-loop for logbooks in
-             (org-ql-select (or org-harvest-files
-                                org-agenda-files)
-               org-harvest--sync-query
-               :action
-               `(lambda
-                  ()
-                  (let ((marker (point-marker))
-                        (out (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
-                    (message "marker: %S" marker)
-                    (org-harvest--sync-action out ',headers marker)
-                    (message "out: %s" out))))
-             do (message "done!"))
-    (setq org-ql-cache (make-hash-table :test 'equal))
-    ))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; autoloads/interactive ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;;;###autoload
 (defun org-harvest-tasks ()
@@ -420,7 +403,12 @@ return a list with an element for each clock line."
 ;;;###autoload
 (defun org-harvest-sync ()
   (interactive)
-  (org-harvest--sync)
-  (message "done!"))
+  (let* ((authinfo (org-harvest--get-authinfo))
+         (headers (org-harvest--make-request-headers authinfo)))
+    (org-ql-select (or org-harvest-files
+                       org-agenda-files)
+      org-harvest--sync-query
+      :action `(lambda () ,(org-harvest--sync-action headers)))
+    (setq org-ql-cache (make-hash-table :test 'equal))))
 
 ;;; org-harvest2.el ends here
