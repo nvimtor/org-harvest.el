@@ -228,7 +228,7 @@ Returns a complete list of assignments."
     :data content
     :success (cl-function
               (lambda (&key data &allow-other-keys)
-                (alist-get 'id data)))))
+                (funcall cb (alist-get 'id data))))))
 
 (defun org-harvest--tasks-get-cands (project-assignments)
   "Convert PROJECT-ASSIGNMENTS into a list of JSON-encoded strings.
@@ -346,7 +346,6 @@ Example of one returned JSON candidate:
 
 (defun org-harvest--sync-get-total-hours (logbooks)
   "Sums up the hours for each logbook in LOGBOOKS."
-  (message "called with: %S" logbooks)
   (seq-reduce #'+
               (mapcar (lambda (logb)
                         (string-to-number (alist-get 'hours logb)))
@@ -355,27 +354,17 @@ Example of one returned JSON candidate:
 
 (defun org-harvest--sync-action (logbooks headers cb)
   "TODO docstring."
-  (let ((hours       (org-harvest--sync-get-total-hours logbooks)))
-         ;; (content `(("project_id" . ,projid)
-         ;;            ("task_id"    . ,taskid)
-         ;;            ("spent_date" . ,spentdate)
-         ;;            ("hours"      . ,hours))))
-    (message "data is: %s" logbooks)
-    (message "hours is: %s" hours)
-
-    (message "length: %s" (length logbooks))
-    ;; (message "unpushed id: %s" unpushedid)
-
-    ;; (when unpushedid
-    ;;   (org-harvest--post-time-entry
-    ;;    unpushedid
-    ;;    content
-    ;;    headers
-    ;;    cb)
-    ;;   (message "unpushed!"))
-
-    (when timesheetid
-      (message "hello there!"))))
+  (let-alist (car logbooks)
+    (let* ((hours (org-harvest--sync-get-total-hours logbooks))
+          (content `(("project_id" . ,.projid)
+                     ("task_id"    . ,.taskid)
+                     ("spent_date" . ,.spent_date)
+                     ("hours"      . ,hours))))
+      (when .unpushedid
+        (message "unpushed, starting...")
+        (org-harvest--post-time-entry .unpushedid content headers cb))
+      (message "total hours: %s" hours)
+      (message "data: %s" content))))
 
 (defun org-harvest--sync ()
   "Run org-ql to process all headings in `org-clock-export-files' and
