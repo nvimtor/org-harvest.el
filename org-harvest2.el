@@ -352,7 +352,7 @@ Example of one returned JSON candidate:
                       logbooks)
               0))
 
-(defun org-harvest--sync-action (logbooks headers cb)
+(defun org-harvest--sync-action (logbooks headers)
   "TODO docstring."
   (let-alist (car logbooks)
     (let* ((hours (org-harvest--sync-get-total-hours logbooks))
@@ -362,9 +362,20 @@ Example of one returned JSON candidate:
                      ("hours"      . ,hours))))
       (when .unpushedid
         (message "unpushed, starting...")
-        (org-harvest--post-time-entry .unpushedid content headers cb))
+        (org-harvest--post-time-entry
+         .unpushedid
+         content
+         headers
+         (lambda
+           (newid)
+           (org-entry-delete nil "HARVEST_UNPUSHED_ID")
+           (org-entry-put nil "HARVEST_TIMESHEET_ID" newid))))
+
       (message "total hours: %s" hours)
       (message "data: %s" content))))
+
+;; (defun org-harvest--unpushed-to-pushed-header (unpushedid timesheetid)
+;;   (org-entry))
 
 (defun org-harvest--sync ()
   "Run org-ql to process all headings in `org-clock-export-files' and
@@ -376,22 +387,7 @@ return a list with an element for each clock line."
                                 org-agenda-files)
                org-harvest--sync-query
                :action `(org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format))
-               ;; :action `(lambda ()
-               ;;            (let* ((data (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
-               ;;              (message "type here: %S" (type-of (alist-get 'hours data)))
-               ;;              (org-harvest--sync-action
-               ;;               data
-               ;;               ',headers
-               ;;               '(lambda (newid)
-               ;;                  (message "new id?a!: %s" newid)))
-               ;;              data)))
-             ;; do (message "test: %s" (alist-get 'projid each)))
-             ;; do (message "test: %s" (consp (car (car each)))))
-             ;; do (message "test: %s" (alist-get "unpushedid" (car each) nil nil #'equal)))
-             do (org-harvest--sync-action
-                 logbooks
-                 headers
-                 (lambda (newid) (message "newid: %s" newid))))
+             do (org-harvest--sync-action logbooks headers))
     (setq org-ql-cache (make-hash-table :test 'equal))
     ))
 

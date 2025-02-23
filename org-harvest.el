@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2025  Vitor Leal
 
-;; Author: Vitor Leal <hellofromvitor@gmail.com>
+;; Author: Vitor Leal <hellofromvitor@proton.me>
 ;; URL: https://github.com/nvimtor/org-harvest.el
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "25.1"))
@@ -22,10 +22,10 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-;;; Commentary: TODO
+;;; Commentary:
 ;;
-;; The git-commit-jira package automatically inserts JIRA ticket identifiers
-;; into git commit messages based on the current branch name.
+;; The org-harvest.el package allows you to use org-mode to control your Harvest
+;; timesheets.
 ;;
 
 ;;; Code:
@@ -306,7 +306,6 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
 ;;;;;;;;;;;;
 ;; public ;;
 ;;;;;;;;;;;;
-
 ;;;###autoload
 (defun org-harvest-tasks ()
   (interactive)
@@ -328,7 +327,7 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
   "TODO docstring"
   (interactive)
   (let* ((new-state-file (expand-file-name
-                          (format "%s.csv" (org-harvest--xah/get-random-uuid))
+                          (format "%s.csv" "current")
                           org-harvest-state-dir))
          (org-clock-export-org-ql-query org-harvest--org-clock-export-query)
          (org-clock-export-files org-harvest-files)
@@ -343,6 +342,10 @@ org-harvest-0, org-harvest-1, ..., org-harvest-4."
                     org-harvest--prev-state-file
                     new-state-file)))
       (org-harvest--clean-deletes deletes)
+      (copy-file
+       new-state-file
+       (expand-file-name (format "%s.csv" "prev") org-harvest-state-dir)
+       :ok-if-already-exists t)
       (setq org-harvest--prev-state-file new-state-file))))
 
 ;;; org-harvest.el ends here
