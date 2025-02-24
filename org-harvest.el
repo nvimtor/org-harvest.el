@@ -202,19 +202,19 @@ Returns a complete list of assignments."
 
 (defun org-harvest--patch-time-entry (id
                                       content
-                                      headers)
+                                      headers
+                                      onerrcb)
   (request
     (concat org--harvest-time-entries-api-url "/" id)
     :type "PATCH"
     :parser 'json-read
     :headers headers
     :data content
-    :success (cl-function
-              (lambda (&key data &allow-other-keys)
-                (message "patched")))))
+    :error (cl-function
+            (lambda (&rest _ &key _ &allow-other-keys)
+              (funcall onerrcb)))))
 
-(defun org-harvest--post-time-entry (id
-                                     content
+(defun org-harvest--post-time-entry (content
                                      headers
                                      cb)
   (request org--harvest-time-entries-api-url
@@ -378,7 +378,6 @@ Example of one returned JSON candidate:
                      ("notes"      . ,notes))))
       (when .unpushedid
         (org-harvest--post-time-entry
-         .unpushedid
          content
          headers
          (lambda
@@ -391,7 +390,17 @@ Example of one returned JSON candidate:
         (org-harvest--patch-time-entry
          .timesheetid
          content
-         headers))
+         headers
+         (lambda ()
+           (org-harvest--post-time-entry
+            content
+            headers
+            (lambda (newid)
+              (org-harvest--in-marker marker
+                                      (org-entry-put
+                                       nil
+                                       "HARVEST_TIMESHEET_ID"
+                                       (number-to-string newid))))))))
 
       (message "total hours: %s" hours)
       (message "data: %s" content))))
