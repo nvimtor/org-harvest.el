@@ -376,8 +376,7 @@ Example of one returned JSON candidate:
          headers
          (lambda
            (newid)
-           (with-current-buffer (marker-buffer marker)
-             (goto-char marker)
+           (org-harvest--in-marker marker
              (org-entry-delete nil "HARVEST_UNPUSHED_ID")
              (org-entry-put nil "HARVEST_TIMESHEET_ID" (number-to-string newid))))))
       (message "total hours: %s" hours)
