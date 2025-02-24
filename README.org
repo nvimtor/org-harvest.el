@@ -1,1 +1,6 @@
-* org-harvest.el
+#+title: org-harvest.el - Control Harvest timesheets in org-mode
+
+This package allows you to add/update/delete [[https://www.getharvest.com/][Harvest]] timesheets using org-mode.
+
+* Screenshots
+[[./docs/demo.gif]]
