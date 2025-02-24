@@ -358,7 +358,6 @@ Example of one returned JSON candidate:
   (org-get-heading t t t nil))
 
 (defun org-harvest--get-notes (&optional optmarker)
-  (interactive)
   (let ((marker (or optmarker (point-marker))))
     (org-harvest--in-marker
      marker
