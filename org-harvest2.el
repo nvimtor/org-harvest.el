@@ -352,14 +352,34 @@ Example of one returned JSON candidate:
                       logbooks)
               0))
 
+(defmacro org-harvest--in-marker (marker &rest body)
+  "Execute BODY in the buffer of MARKER with point at the marker's position."
+  `(with-current-buffer (marker-buffer ,marker)
+     (goto-char ,marker)
+     ,@body))
+
+(defun org-harvest--get-heading-for-notes ()
+  (org-get-heading t t t nil))
+
+(defun org-harvest--get-notes (&optional optmarker)
+  (interactive)
+  (let ((marker (or optmarker (point-marker))))
+    (org-harvest--in-marker
+     marker
+     (if-let* ((customnotes (org-entry-get nil "HARVEST_NOTES")))
+         customnotes
+       (org-harvest--get-heading-for-notes)))))
+
 (defun org-harvest--sync-logbooks (logbooks headers marker)
   "TODO docstring. MARKER is where the heading is located."
   (let-alist (car logbooks)
     (let* ((hours (org-harvest--sync-get-total-hours logbooks))
+           (notes (org-harvest--get-notes marker))
           (content `(("project_id" . ,.projid)
                      ("task_id"    . ,.taskid)
                      ("spent_date" . ,.spent_date)
-                     ("hours"      . ,hours))))
+                     ("hours"      . ,hours)
+                     ("notes"      . ,notes))))
       (when .unpushedid
         (org-harvest--post-time-entry
          .unpushedid
