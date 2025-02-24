@@ -400,10 +400,7 @@ Example of one returned JSON candidate:
                                       (org-entry-put
                                        nil
                                        "HARVEST_TIMESHEET_ID"
-                                       (number-to-string newid))))))))
-
-      (message "total hours: %s" hours)
-      (message "data: %s" content))))
+                                       (number-to-string newid)))))))))))
 
 (defun org-harvest--sync-action (headers)
   `(let ((marker (point-marker))
