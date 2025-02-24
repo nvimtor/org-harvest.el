@@ -50,13 +50,6 @@
   :type 'list
   :group 'org-harvest)
 
-(defcustom org-harvest-state-dir
-  ;; (expand-file-name "org-harvest-state.csv" temporary-file-directory)
-  temporary-file-directory
-  "Path to the file where org-harvest stores temporary state data."
-  :type 'directory
-  :group 'org-harvest)
-
 ;; NOTE from xah, modified to return instead of insert
 (defun org-harvest--xah/get-random-uuid ()
   "Return a UUID string.
@@ -196,9 +189,6 @@ Returns a complete list of assignments."
 ;; patch (not created)
 ;; create
 ;; add id to state
-
-;; filesystem state (txt file)
-;; will hold pushed IDs
 
 (defun org-harvest--delete-time-entry (id
                                      projid
