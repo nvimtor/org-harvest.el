@@ -202,9 +202,16 @@ Returns a complete list of assignments."
 
 (defun org-harvest--patch-time-entry (id
                                       content
-                                      headers
-                                      cb)
-  ())
+                                      headers)
+  (request
+    (concat org--harvest-time-entries-api-url "/" id)
+    :type "PATCH"
+    :parser 'json-read
+    :headers headers
+    :data content
+    :success (cl-function
+              (lambda (&key data &allow-other-keys)
+                (message "patched")))))
 
 (defun org-harvest--post-time-entry (id
                                      content
@@ -379,6 +386,13 @@ Example of one returned JSON candidate:
            (org-harvest--in-marker marker
              (org-entry-delete nil "HARVEST_UNPUSHED_ID")
              (org-entry-put nil "HARVEST_TIMESHEET_ID" (number-to-string newid))))))
+
+      (when .timesheetid
+        (org-harvest--patch-time-entry
+         .timesheetid
+         content
+         headers))
+
       (message "total hours: %s" hours)
       (message "data: %s" content))))
 
