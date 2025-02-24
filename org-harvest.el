@@ -436,7 +436,6 @@ Example of one returned JSON candidate:
     (org-ql-select (or org-harvest-files
                        org-agenda-files)
       org-harvest--sync-query
-      :action `(lambda () ,(org-harvest--sync-action headers)))
-    (setq org-ql-cache (make-hash-table :test 'equal))))
+      :action `(lambda () ,(org-harvest--sync-action headers)))))
 
 ;;; org-harvest.el ends here
