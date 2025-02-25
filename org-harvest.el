@@ -180,18 +180,6 @@ Returns a complete list of assignments."
                   assignments)))
     (go org--harvest-project-assignments-api-url nil)))
 
-;; first comes the DELETEs
-
-;; unpushed id (internal)
-;; create (already exists)
-;; patch it
-;; add id to state
-
-;; timesheet id (from harvest)
-;; patch (not created)
-;; create
-;; add id to state
-
 (defun org-harvest--delete-time-entry (id
                                      projid
                                      taskid
@@ -369,39 +357,41 @@ Example of one returned JSON candidate:
 
 (defun org-harvest--sync-logbooks (logbooks headers marker)
   "TODO docstring. MARKER is where the heading is located."
-  (let-alist (car logbooks)
-    (let* ((hours (org-harvest--sync-get-total-hours logbooks))
-           (notes (org-harvest--get-notes marker))
-          (content `(("project_id" . ,.projid)
-                     ("task_id"    . ,.taskid)
-                     ("spent_date" . ,.spent_date)
-                     ("hours"      . ,hours)
-                     ("notes"      . ,notes))))
-      (when .unpushedid
-        (org-harvest--post-time-entry
-         content
-         headers
-         (lambda
-           (newid)
-           (org-harvest--in-marker marker
-             (org-entry-delete nil "HARVEST_UNPUSHED_ID")
-             (org-entry-put nil "HARVEST_TIMESHEET_ID" (number-to-string newid))))))
+  (dolist (entry logbooks)
+    (let-alist entry
+      (let* ((notes (org-harvest--get-notes marker))
+             (content `(("project_id" . ,.projid)
+                        ("task_id"    . ,.taskid)
+                        ("spent_date" . ,.spent_date)
+                        ("hours"      . ,.hours)
+                        ("notes"      . ,notes))))
 
-      (when .timesheetid
-        (org-harvest--patch-time-entry
-         .timesheetid
-         content
-         headers
-         (lambda ()
-           (org-harvest--post-time-entry
-            content
-            headers
-            (lambda (newid)
-              (org-harvest--in-marker marker
-                                      (org-entry-put
-                                       nil
-                                       "HARVEST_TIMESHEET_ID"
-                                       (number-to-string newid)))))))))))
+        (when .unpushedid
+          (org-harvest--post-time-entry
+           content
+           headers
+           (lambda
+             (newid)
+             (org-harvest--in-marker marker
+                                     (org-entry-delete nil "HARVEST_UNPUSHED_ID")
+                                     (org-entry-put nil "HARVEST_TIMESHEET_ID" (number-to-string newid))))))
+
+        (when .timesheetid
+          (org-harvest--patch-time-entry
+           .timesheetid
+           content
+           headers
+           (lambda ()
+             (org-harvest--post-time-entry
+              content
+              headers
+              (lambda (newid)
+                (org-harvest--in-marker marker
+                                        (org-entry-put
+                                         nil
+                                         "HARVEST_TIMESHEET_ID"
+                                         (number-to-string newid))))))))))))
+
 
 (defun org-harvest--sync-action (headers)
   `(let ((marker (point-marker))
