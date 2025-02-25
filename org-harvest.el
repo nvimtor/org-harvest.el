@@ -129,10 +129,6 @@ Version: 2020-06-04 2023-05-13"
   "https://api.harvestapp.com/v2/users/me/project_assignments"
   "Harvest API URL for user project assignments.")
 
-(defconst org--harvest-time-entries-api-url
-  "https://api.harvestapp.com/v2/time_entries"
-  "Harvest API URL for time entries.")
-
 (defvar org-harvest--projects-cache '()
   "Recently fetched projects from Harvest.")
 
