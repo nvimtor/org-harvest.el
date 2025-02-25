@@ -437,4 +437,6 @@ Example of one returned JSON candidate:
       org-harvest--sync-query
       :action `(lambda () ,(org-harvest--sync-action headers)))))
 
+(provide 'org-harvest)
+
 ;;; org-harvest.el ends here
