@@ -5,7 +5,7 @@
 ;; Author: Vitor Leal <hellofromvitor@proton.me>
 ;; URL: https://github.com/nvimtor/org-harvest.el
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "25.1"))
+;; Package-Requires: ((emacs "25.1") (consult "2.0") (org-ql "0.8.10"))
 
 ;; This file is not part of GNU Emacs.
 
@@ -36,6 +36,8 @@
 (require 'cl-lib)
 (require 'json)
 (require 'url)
+(require 'org-ql)
+(require 'consult)
 
 ;;;;;;;;;;;;
 ;; custom ;;
