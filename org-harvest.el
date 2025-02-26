@@ -415,6 +415,7 @@ Example of one returned JSON candidate:
                   consult-async-split-styles-alist))
          (consult-async-split-style 'org-harvest--none)
          (consult-async-min-input 0)
+         (consult-async-refresh-delay 0)
          (consult-async-input-throttle 1000)
          (authinfo (org-harvest--get-authinfo))
          (headers (org-harvest--make-request-headers authinfo)))
