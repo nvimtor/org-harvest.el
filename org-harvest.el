@@ -398,6 +398,10 @@ Example of one returned JSON candidate:
         (logbooks (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
     (org-harvest--sync-logbooks logbooks ',headers marker)))
 
+(defun org-harvest--consult-async-split-none (_str &optional _plist)
+  "Completely ignore input STR for splitting/filtering."
+  (list "" 0))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; autoloads/interactive ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -405,12 +409,18 @@ Example of one returned JSON candidate:
 ;;;###autoload
 (defun org-harvest-tasks ()
   (interactive)
-  (let* ((authinfo (org-harvest--get-authinfo))
+  (let* ((consult-async-split-styles-alist
+          (append '((org-harvest--none
+                     :function org-harvest--consult-async-split-none))
+                  consult-async-split-styles-alist))
+         (consult-async-split-style 'org-harvest--none)
+         (consult-async-min-input 0)
+         (consult-async-input-throttle 1000)
+         (authinfo (org-harvest--get-authinfo))
          (headers (org-harvest--make-request-headers authinfo)))
     (consult--read
      (consult--dynamic-collection
-         (lambda (input cb)
-           (ignore input)
+         (lambda (_input cb)
            (funcall cb org-harvest--projects-cache)
            (let* ((res (org-harvest--get-proj-assignments headers))
                   (cands (org-harvest--tasks-get-cands res)))
