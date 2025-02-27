@@ -348,12 +348,16 @@ Example of one returned JSON candidate:
   (org-get-heading t t t nil))
 
 (defun org-harvest--get-notes (&optional optmarker)
+  "Return notes for Harvest from the heading at OPTMARKER (or current point).
+If the HARVEST_NOTES property is set on that heading, return it.
+Otherwise, build a slash‐separated path from the top‐level heading
+down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
   (let ((marker (or optmarker (point-marker))))
-    (org-harvest--in-marker
-     marker
-     (if-let* ((customnotes (org-entry-get nil "HARVEST_NOTES")))
-         customnotes
-       (org-harvest--get-heading-for-notes)))))
+    (org-harvest--in-marker marker
+      (if-let* ((customnotes (org-entry-get nil "HARVEST_NOTES")))
+          customnotes
+        (mapconcat #'identity (org-get-outline-path t) " / ")))))
+
 
 (defun org-harvest--sync-logbooks (logbooks headers marker)
   "TODO docstring. MARKER is where the heading is located."
