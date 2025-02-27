@@ -361,13 +361,14 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
 
 (defun org-harvest--sync-logbooks (logbooks headers marker)
   "TODO docstring. MARKER is where the heading is located."
-  (dolist (entry logbooks)
-    (let-alist entry
+  (let ((first-entry (car logbooks))
+        (total-hours (org-harvest--sync-get-total-hours logbooks)))
+    (let-alist first-entry
       (let* ((notes (org-harvest--get-notes marker))
              (content `(("project_id" . ,.projid)
                         ("task_id"    . ,.taskid)
                         ("spent_date" . ,.spent_date)
-                        ("hours"      . ,.hours)
+                        ("hours"      . ,total-hours)
                         ("notes"      . ,notes))))
 
         (when .unpushedid
@@ -378,8 +379,10 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
              (newid)
              (org-harvest--in-marker marker
                                      (org-entry-delete nil "HARVEST_UNPUSHED_ID")
-                                     (org-entry-put nil "HARVEST_TIMESHEET_ID" (number-to-string newid))))))
-
+                                     (org-entry-put
+                                      nil
+                                      "HARVEST_TIMESHEET_ID"
+                                      (number-to-string newid))))))
         (when .timesheetid
           (org-harvest--patch-time-entry
            .timesheetid
@@ -396,7 +399,6 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
                                          "HARVEST_TIMESHEET_ID"
                                          (number-to-string newid))))))))))))
 
-
 (defun org-harvest--sync-action (headers)
   `(let ((marker (point-marker))
         (logbooks (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
@@ -406,10 +408,12 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
   "Completely ignore input STR for splitting/filtering."
   (list "" 0))
 
+(defun org-harvest--org-ql-clear-cache ()
+  (setq org-ql-cache (make-hash-table :test 'equal)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; autoloads/interactive ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 ;;;###autoload
 (defun org-harvest-tasks ()
   (interactive)
@@ -442,7 +446,7 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
     (org-ql-select (or org-harvest-files
                        org-agenda-files)
       org-harvest--sync-query
-      :action `(lambda () ,(org-harvest--sync-action headers)))))
+      :action `(lambda () ,(org-harvest--sync-action headers))))))
 
 (provide 'org-harvest)
 
