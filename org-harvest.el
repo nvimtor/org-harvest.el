@@ -52,6 +52,12 @@
   :type 'list
   :group 'org-harvest)
 
+(defcustom org-harvest-state-path
+  (expand-file-name "org-harvest/ids" user-emacs-directory)
+  "File where org-harvest will store IDs pushed to Harvest."
+  :type 'file
+  :group 'org-harvest)
+
 ;; NOTE from xah, modified to return instead of insert
 (defun org-harvest--xah/get-random-uuid ()
   "Return a UUID string.
@@ -181,14 +187,16 @@ Returns a complete list of assignments."
     (go org--harvest-project-assignments-api-url nil)))
 
 (defun org-harvest--delete-time-entry (id
-                                     projid
-                                     taskid
-                                     spentdate
-                                     hours
-                                     headers
-                                     cb)
-  ())
-
+                                       headers
+                                       onerrorcb)
+  (request
+    (concat org--harvest-time-entries-api-url "/" id)
+    :type "DELETE"
+    :parser 'json-read
+    :headers headers
+    :error (cl-function
+            (lambda (&rest _ &key _ &allow-other-keys)
+              (funcall onerrcb)))))
 
 (defun org-harvest--patch-time-entry (id
                                       content
@@ -396,11 +404,63 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
                                          "HARVEST_TIMESHEET_ID"
                                          (number-to-string newid))))))))))))
 
-
 (defun org-harvest--sync-action (headers)
-  `(let ((marker (point-marker))
-        (logbooks (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
-    (org-harvest--sync-logbooks logbooks ',headers marker)))
+  (let* ((marker (point-marker))
+         (timesheetid (org-entry-get marker "HARVEST_TIMESHEET_ID")))
+    `(let ((logbooks (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
+       '((action   . (lambda () (org-harvest--sync-logbooks logbooks ',headers ,marker)))
+         (pushedid . ,timesheetid)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;
+;; state file handling ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defun org-harvest--ensure-state-file-exists ()
+  (unless (file-exists-p org-harvest-state-path)
+    (let ((dir (file-name-directory org-harvest-state-path)))
+      (unless (file-exists-p dir)
+        (make-directory dir t)))
+    (with-temp-buffer
+      (write-region (point-min) (point-max) org-harvest-state-path))))
+
+(defun org-harvest--read-ids-from-state ()
+  "Return a list of IDs from `org-harvest-state-path', creating the file if it doesn't exist.
+Each ID is expected to be on its own line."
+  (org-harvest--ensure-state-file-exists)
+  (with-temp-buffer
+    (insert-file-contents org-harvest-state-path)
+    (split-string (buffer-string) "\n" t)))
+
+(defun org-harvest--push-ids-to-state (ids)
+  "Overwrite `org-harvest-state-path' with IDS.
+IDS is a list of strings representing IDs. The file is cleared first,
+and then each ID is written on a new line."
+  (org-harvest--ensure-state-file-exists)
+  (let ((contents (concat (mapconcat 'identity ids "\n") "\n")))
+    (write-region contents nil org-harvest-state-path nil)))
+
+;;;;;;;;;;;;;
+;; deletes ;;
+;;;;;;;;;;;;;
+(defun org-harvest--sync-deletes (pushed-ids headers)
+  (let* ((ids (org-harvest--read-ids-from-state))
+        (diff (cl-set-difference ids pushed-ids :test #'equal)))
+    (message "diff is: %s" diff)
+    (dolist (id diff)
+      (org-harvest--delete-time-entry
+       id
+       headers
+       (lambda (err) (error "Error deleting time entry: %S" err))))
+    ))
+
+;;;;;;;;;;;
+;; utils ;;
+;;;;;;;;;;;
+
+(defun org-harvest--alist-get-all (key alist)
+  (cl-loop for (k . v) in alist
+           when (equal k key)
+           collect v))
 
 (defun org-harvest--consult-async-split-none (_str &optional _plist)
   "Completely ignore input STR for splitting/filtering."
@@ -438,11 +498,17 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
 (defun org-harvest-sync ()
   (interactive)
   (let* ((authinfo (org-harvest--get-authinfo))
-         (headers (org-harvest--make-request-headers authinfo)))
-    (org-ql-select (or org-harvest-files
-                       org-agenda-files)
-      org-harvest--sync-query
-      :action `(lambda () ,(org-harvest--sync-action headers)))))
+         (auth-headers (org-harvest--make-request-headers authinfo))
+         (org-headers (org-ql-select (or org-harvest-files org-agenda-files)
+                org-harvest--sync-query
+                :action (lambda () (eval (org-harvest--sync-action auth-headers)))))
+         (flattened (apply #'append org-headers))
+         (pushed-ids (org-harvest--alist-get-all 'pushedid flattened)))
+    (org-harvest--sync-deletes pushed-ids auth-headers)
+
+    ;; TODO call each action in org-headers
+    ;; then push successful IDs to state file
+    (setq org-ql-cache (make-hash-table :test 'equal))))
 
 (provide 'org-harvest)
 
