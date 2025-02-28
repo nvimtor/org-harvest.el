@@ -270,13 +270,6 @@ Example of one returned JSON candidate:
       .taskName)))
 
 (defun org-harvest--assign-task (projid taskid)
-  (when (not (or
-              (org-entry-get nil "HARVEST_UNPUSHED_ID")
-              (org-entry-get nil "HARVEST_TIMESHEET_ID")))
-    (org-entry-put
-     nil
-     "HARVEST_UNPUSHED_ID"
-     (org-harvest--xah/get-random-uuid)))
   (org-entry-put nil "HARVEST_PROJECT_ID" projid)
   (org-entry-put nil "HARVEST_TASK_ID" taskid))
 
@@ -290,8 +283,7 @@ Example of one returned JSON candidate:
 
 ;; NOTE sync portion
 (defvar org-harvest--export-data-format
-  '('unpushedid (org-entry-get (point) "HARVEST_UNPUSHED_ID")
-    'timesheetid (org-entry-get (point) "HARVEST_TIMESHEET_ID")
+  '('timesheetid (org-entry-get (point) "HARVEST_TIMESHEET_ID")
     'projid (org-entry-get (point) "HARVEST_PROJECT_ID" t)
     'taskid (org-entry-get (point) "HARVEST_TASK_ID" t)
     'spent_date (format "%04d-%02d-%02d"
@@ -325,10 +317,7 @@ Example of one returned JSON candidate:
 (defvar org-harvest--sync-query
   '(and (clocked)
         (property "HARVEST_PROJECT_ID" :inherit t)
-        (property "HARVEST_TASK_ID" :inherit t)
-        (or
-         (property "HARVEST_UNPUSHED_ID")
-         (property "HARVEST_TIMESHEET_ID"))))
+        (property "HARVEST_TASK_ID" :inherit t)))
 
 (defun org-harvest--sync-get-total-hours (logbooks)
   "Sums up the hours for each logbook in LOGBOOKS."
@@ -358,7 +347,6 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
           customnotes
         (mapconcat #'identity (org-get-outline-path t) " / ")))))
 
-
 (defun org-harvest--sync-logbooks (logbooks headers marker)
   "TODO docstring. MARKER is where the heading is located."
   (let ((first-entry (car logbooks))
@@ -370,20 +358,17 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
                         ("spent_date" . ,.spent_date)
                         ("hours"      . ,total-hours)
                         ("notes"      . ,notes))))
-
-        (when .unpushedid
-          (org-harvest--post-time-entry
-           content
-           headers
-           (lambda
-             (newid)
-             (org-harvest--in-marker marker
-                                     (org-entry-delete nil "HARVEST_UNPUSHED_ID")
-                                     (org-entry-put
-                                      nil
-                                      "HARVEST_TIMESHEET_ID"
-                                      (number-to-string newid))))))
-        (when .timesheetid
+        (if (not .timesheetid)
+            (org-harvest--post-time-entry
+             content
+             headers
+             (lambda
+               (newid)
+               (org-harvest--in-marker marker
+                                       (org-entry-put
+                                        nil
+                                        "HARVEST_TIMESHEET_ID"
+                                        (number-to-string newid)))))
           (org-harvest--patch-time-entry
            .timesheetid
            content
