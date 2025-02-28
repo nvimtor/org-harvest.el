@@ -47,7 +47,7 @@
   :group 'tools
   :prefix "org-harvest-")
 
-(defcustom org-harvest-files org-agenda-files
+(defcustom org-harvest-files 'org-agenda-files
   "Org files that will be used to query for org-harvest logbooks."
   :type 'list
   :group 'org-harvest)
@@ -429,8 +429,7 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
   (interactive)
   (let* ((authinfo (org-harvest--get-authinfo))
          (headers (org-harvest--make-request-headers authinfo)))
-    (org-ql-select (or org-harvest-files
-                       org-agenda-files)
+    (org-ql-select org-harvest-files
       org-harvest--sync-query
       :action `(lambda () ,(org-harvest--sync-action headers)))))
 
