@@ -292,8 +292,8 @@ Example of one returned JSON candidate:
 (defvar org-harvest--export-data-format
   '('unpushedid (org-entry-get (point) "HARVEST_UNPUSHED_ID")
     'timesheetid (org-entry-get (point) "HARVEST_TIMESHEET_ID")
-    'projid (org-entry-get (point) "HARVEST_PROJECT_ID")
-    'taskid (org-entry-get (point) "HARVEST_TASK_ID")
+    'projid (org-entry-get (point) "HARVEST_PROJECT_ID" t)
+    'taskid (org-entry-get (point) "HARVEST_TASK_ID" t)
     'spent_date (format "%04d-%02d-%02d"
                          (string-to-number start-year)
                          (string-to-number start-month)
@@ -324,8 +324,8 @@ Example of one returned JSON candidate:
 
 (defvar org-harvest--sync-query
   '(and (clocked)
-        (property "HARVEST_PROJECT_ID")
-        (property "HARVEST_TASK_ID")
+        (property "HARVEST_PROJECT_ID" :inherit t)
+        (property "HARVEST_TASK_ID" :inherit t)
         (or
          (property "HARVEST_UNPUSHED_ID")
          (property "HARVEST_TIMESHEET_ID"))))
@@ -401,7 +401,7 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
 
 (defun org-harvest--sync-action (headers)
   `(let ((marker (point-marker))
-        (logbooks (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
+         (logbooks (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
     (org-harvest--sync-logbooks logbooks ',headers marker)))
 
 (defun org-harvest--consult-async-split-none (_str &optional _plist)
@@ -409,6 +409,7 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
   (list "" 0))
 
 (defun org-harvest--org-ql-clear-cache ()
+  (interactive)
   (setq org-ql-cache (make-hash-table :test 'equal)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -446,7 +447,7 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
     (org-ql-select (or org-harvest-files
                        org-agenda-files)
       org-harvest--sync-query
-      :action `(lambda () ,(org-harvest--sync-action headers))))))
+      :action `(lambda () ,(org-harvest--sync-action headers)))))
 
 (provide 'org-harvest)
 
