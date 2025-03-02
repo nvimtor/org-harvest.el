@@ -347,10 +347,10 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
           customnotes
         (mapconcat #'identity (org-get-outline-path t) " / ")))))
 
-(defun org-harvest--sync-logbooks (logbooks headers marker)
+(defun org-harvest--sync-logbook (logbook headers marker)
   "TODO docstring. MARKER is where the heading is located."
-  (let ((first-entry (car logbooks))
-        (total-hours (org-harvest--sync-get-total-hours logbooks)))
+  (let ((first-entry (car logbook))
+        (total-hours (org-harvest--sync-get-total-hours logbook)))
     (let-alist first-entry
       (let* ((notes (org-harvest--get-notes marker))
              (content `(("project_id" . ,.projid)
@@ -386,8 +386,8 @@ down to the current one, e.g. \"Project / Subtask / Sub-subtask\"."
 
 (defun org-harvest--sync-action (headers)
   `(let ((marker (point-marker))
-         (logbooks (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
-    (org-harvest--sync-logbooks logbooks ',headers marker)))
+         (logbook (org-harvest--parse-clock-lines-in-heading ,org-harvest--export-data-format)))
+    (org-harvest--sync-logbook logbook ',headers marker)))
 
 (defun org-harvest--consult-async-split-none (_str &optional _plist)
   "Completely ignore input STR for splitting/filtering."
