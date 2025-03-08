@@ -52,6 +52,11 @@
   :type 'list
   :group 'org-harvest)
 
+(defcustom org-harvest-account-id nil
+  "Account ID for Harvest."
+  :type 'number
+  :group 'org-harvest)
+
 ;; NOTE from xah, modified to return instead of insert
 (defun org-harvest--xah/get-random-uuid ()
   "Return a UUID string.
@@ -137,21 +142,22 @@ Version: 2020-06-04 2023-05-13"
   "Recently fetched projects from Harvest.")
 
 (defun org-harvest--get-authinfo ()
-  "Retrieve Harvest authentication info from .authinfo.
+  "Retrieve Harvest authentication info from auth-sources.
 Returns a plist with :harvest-pat and :harvest-account-id.
 Expects an entry with host \"harvestapp.com\" containing the token as the user
 and the account ID as the secret."
   (let* ((entry (car (auth-source-search :host "harvestapp.com"
+                                         :user org-harvest-account-id
                                            :require '(:user :secret)
                                            :max 1)))
          (harvest-account-id (plist-get entry :user))
          (harvest-pat (if (functionp (plist-get entry :secret))
                                  (funcall (plist-get entry :secret))
                                (plist-get entry :secret))))
-    (unless (and harvest-pat (not (string= harvest-pat "")))
-      (error "HARVEST_PAT not found in .authinfo"))
-    (unless (and harvest-account-id (not (string= harvest-account-id "")))
-      (error "HARVEST_ACCOUNT_ID not found in .authinfo"))
+    (unless harvest-pat
+      (error "HARVEST_PAT not found in auth-sources"))
+    (unless harvest-account-id
+      (error "HARVEST_ACCOUNT_ID not found in auth-sources"))
     (list :harvest-pat harvest-pat :harvest-account-id harvest-account-id)))
 
 (defun org-harvest--make-request-headers (authinfo)
